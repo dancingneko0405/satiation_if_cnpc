@@ -125,7 +125,6 @@ for (let b=0; b<4; b++){
 }
 window.main_order = main_order;
 
-
 // 5) NT critical: 4/16/4 split
 //    For each phase (4 lexicalizations), pick 2 with cond=5 (base) and 2 with cond=6 (negated).
 function buildNTCrit(lexList){
@@ -139,10 +138,23 @@ function buildNTCrit(lexList){
 const NT_CRIT_PRE  = buildNTCrit(NT_LEX_PRE);
 const NT_CRIT_POST = buildNTCrit(NT_LEX_POST);
 
-// 6) NT fillers by item_type + polarity
+// 6) NT fillers by item_type + polarity, with pair-level exclusivity across pre+post
+
 const norm = v => String(v || "").trim().toLowerCase();
 
-// All NT fillers, divided by polarity
+// Same question as belonging to the same pair
+function ntPairKey(item){
+  const txt = String(item.sentence || "").trim();
+  const dotIdx = txt.lastIndexOf(".");
+  const q = (dotIdx >= 0 ? txt.slice(dotIdx + 1) : txt)
+              .replace(/\s+/g, " ")            // collapse spaces
+              .replace(/[?.!]+$/,"")           // drop trailing punctuation
+              .toLowerCase()
+              .trim();
+  return q; // e.g., "was there an ancient statue"
+}
+
+// All NT fillers by polarity
 const NT_FILL_BASE_POOL_ALL = shuffle(
   ALL.filter(x => norm(x.item_type) === "filler_negation_test" && norm(x.polarity) === "base")
 );
@@ -151,19 +163,33 @@ const NT_FILL_NEG_POOL_ALL  = shuffle(
                   (norm(x.polarity) === "negated" || norm(x.polarity) === "negation"))
 );
 
-// pre: 4 base + 4 negated (without replacement)
-const NT_FILL_PRE_BASE = NT_FILL_BASE_POOL_ALL.slice(0, 4);
-const NT_FILL_PRE_NEG  = NT_FILL_NEG_POOL_ALL .slice(0, 4);
+// key
+function takeDistinctByKey(pool, count, usedKeys){
+  const out = [];
+  for (const it of pool){
+    const key = ntPairKey(it);
+    if (!usedKeys.has(key)){
+      out.push(it);
+      usedKeys.add(key);
+      if (out.length === count) break;
+    }
+  }
+  return out;
+}
+
+// pre: 4 base + 4 negated
+const usedPairKeys = new Set();
+const NT_FILL_PRE_BASE = takeDistinctByKey(NT_FILL_BASE_POOL_ALL, 4, usedPairKeys);
+const NT_FILL_PRE_NEG  = takeDistinctByKey(NT_FILL_NEG_POOL_ALL , 4, usedPairKeys);
 const NT_FILL_PRE      = NT_FILL_PRE_BASE.concat(NT_FILL_PRE_NEG);
 
-// post: take 4 base + 4 negated from the remaining pools (without replacement, no overlap)
-const usedPreIDs = new Set(NT_FILL_PRE.map(s => s.unique_id));
-const NT_FILL_BASE_POOL_POST = NT_FILL_BASE_POOL_ALL.filter(s => !usedPreIDs.has(s.unique_id));
-const NT_FILL_NEG_POOL_POST  = NT_FILL_NEG_POOL_ALL .filter(s => !usedPreIDs.has(s.unique_id));
+// post: 4 base + 4 negated
+const NT_FILL_BASE_POOL_POST = NT_FILL_BASE_POOL_ALL.filter(x => !NT_FILL_PRE_BASE.includes(x));
+const NT_FILL_NEG_POOL_POST  = NT_FILL_NEG_POOL_ALL .filter(x => !NT_FILL_PRE_NEG .includes(x));
 
-const NT_FILL_POST = NT_FILL_BASE_POOL_POST.slice(0, 4).concat(
-                      NT_FILL_NEG_POOL_POST .slice(0, 4)
-                    );
+const NT_FILL_POST_BASE = takeDistinctByKey(NT_FILL_BASE_POOL_POST, 4, usedPairKeys);
+const NT_FILL_POST_NEG  = takeDistinctByKey(NT_FILL_NEG_POOL_POST , 4, usedPairKeys);
+const NT_FILL_POST      = NT_FILL_POST_BASE.concat(NT_FILL_POST_NEG);
 
 // 7) build NT lists (12 each) with no adjacent criticals
 function buildNTList(critArr, fillArr){
