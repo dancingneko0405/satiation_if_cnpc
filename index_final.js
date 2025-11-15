@@ -125,6 +125,7 @@ for (let b=0; b<4; b++){
 }
 window.main_order = main_order;
 
+
 // 5) NT critical: 4/16/4 split
 //    For each phase (4 lexicalizations), pick 2 with cond=5 (base) and 2 with cond=6 (negated).
 function buildNTCrit(lexList){
@@ -139,7 +140,6 @@ const NT_CRIT_PRE  = buildNTCrit(NT_LEX_PRE);
 const NT_CRIT_POST = buildNTCrit(NT_LEX_POST);
 
 // 6) NT fillers by item_type + polarity, with pair-level exclusivity across pre+post
-
 const norm = v => String(v || "").trim().toLowerCase();
 
 // Same question as belonging to the same pair
@@ -190,6 +190,7 @@ const NT_FILL_NEG_POOL_POST  = NT_FILL_NEG_POOL_ALL .filter(x => !NT_FILL_PRE_NE
 const NT_FILL_POST_BASE = takeDistinctByKey(NT_FILL_BASE_POOL_POST, 4, usedPairKeys);
 const NT_FILL_POST_NEG  = takeDistinctByKey(NT_FILL_NEG_POOL_POST , 4, usedPairKeys);
 const NT_FILL_POST      = NT_FILL_POST_BASE.concat(NT_FILL_POST_NEG);
+
 
 // 7) build NT lists (12 each) with no adjacent criticals
 function buildNTList(critArr, fillArr){
@@ -466,17 +467,26 @@ function make_slides(f) {
   button: function(){
     const resp = $('input[name="nt_response"]:checked').val();
     if (!resp){ $(".err").show(); return; }
+
+    //check for filler type
+    const isFiller = (this.stim.item_type === "filler_negation_test");
+
     exp.data_trials.push({
-      trial_type: "negation_pre",
-      response  : resp,                         // "Yes" / "No" / "Unsure"
-      polarity  : this.stim.polarity || null,   // "base"/"negated"
-      sentence  : this.stim.sentence,           
+      trial_type : "negation_pre",
+      order      : order++,                    // log order
+      is_filler  : isFiller ? 1 : 0,           // 1 = filler, 0 = critical
+      response   : resp,                       // "Yes" / "No" / "Unsure"
+      polarity   : this.stim.polarity || null, // "base"/"negated"
+      sentence   : this.stim.sentence,
       sentence_id: this.stim.unique_id,
     });
+
+    console.log("[DATA] NT_PRE", exp.data_trials[exp.data_trials.length - 1]);
 
     exp.trial_index++;      // one more trial completed
     _stream.apply(this);
   }
+
 });
 
 
@@ -508,16 +518,20 @@ slides.one_slider = slide({
   },
   log_responses : function() {
     exp.data_trials.push({
-      trial_type : "acceptability",
-      response : exp.sliderPost,
-      lexicalization: this.stim.lexicalization || null,
-      sentence: this.stim.sentence,
-      structure: this.stim.structure || null,
+      trial_type       : "acceptability",
+      order            : order++,                     
+      response         : exp.sliderPost,
+      lexicalization   : this.stim.lexicalization || null,
+      sentence         : this.stim.sentence,
+      structure        : this.stim.structure || null,
       dependency_length: this.stim.dependency_length || null,
-      item_type: this.stim.item_type,
-      sentence_id: this.stim.unique_id
+      item_type        : this.stim.item_type,
+      sentence_id      : this.stim.unique_id
     });
+
+    console.log("[DATA] MAIN", exp.data_trials[exp.data_trials.length - 1]);
   }
+
 });
 
 
@@ -545,17 +559,25 @@ slides.negation_test_post = slide({
   button: function(){
     const resp = $('input[name="nt_response"]:checked').val();
     if (!resp){ $(".err").show(); return; }
+
+    const isFiller = (this.stim.item_type === "filler_negation_test");
+
     exp.data_trials.push({
-      trial_type: "negation_post",
-      response  : resp,
-      polarity  : this.stim.polarity || null,
-      sentence  : this.stim.sentence,
+      trial_type : "negation_post",
+      order      : order++,                     
+      is_filler  : isFiller ? 1 : 0,            // 1 = filler, 0 = critical
+      response   : resp,
+      polarity   : this.stim.polarity || null,
+      sentence   : this.stim.sentence,
       sentence_id: this.stim.unique_id,
     });
+
+    console.log("[DATA] NT_POST", exp.data_trials[exp.data_trials.length - 1]);
 
     exp.trial_index++;
     _stream.apply(this);
   }
+
 });
 
 
