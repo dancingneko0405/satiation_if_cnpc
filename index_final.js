@@ -1,6 +1,5 @@
 ///Don't touch lines 2-43.
 var order = 1; 
-var nt_slider_moved = false;   // track whether NT slider has been moved
 /// Helper function that shuffles an array. Don't touch.
 var shuffle = function (array) {
 
@@ -247,38 +246,6 @@ function make_slides(f) {
     }
   });
 
-  // initialize NT sliders (pre & post)
-  $("#nt_slider").slider({
-    value: 50,
-    min: 0,
-    max: 100,
-    step: 1,
-    slide: function(event, ui) {
-      nt_slider_moved = true;
-    }
-  });
-
-  $("#nt_slider_post").slider({
-    value: 50,
-    min: 0,
-    max: 100,
-    step: 1,
-    slide: function(event, ui) {
-      nt_slider_moved = true;
-    }
-  });
-
-  // NT practice slider
-  $("#nt_prac_slider").slider({
-    value: 50,
-    min: 0,
-    max: 100,
-    step: 1,
-    slide: function(event, ui) {
-      nt_slider_moved = true;
-    }
-  });
-
   slides.single_trial = slide({
     name: "single_trial",
     start: function() {
@@ -426,6 +393,7 @@ function make_slides(f) {
     }
   });
 
+    // Negation practice: two-phase (read -> slider), using the same slider logic as acceptability
   slides.negation_practice = slide({
     name: "negation_practice",
 
@@ -437,25 +405,26 @@ function make_slides(f) {
       }
     ],
 
+    // First show instruction + sentence only
     present_handle: function(stim) {
       $(".err").hide();
       this.stim  = stim;
       this.phase = "read";  // first click: from read page to slider page
 
-      // Show instruction + sentence on the first page, hide question block
       $(".neg_instruction").show();
       $("#neg_prac_sentence").html("<b>" + stim.sentence + "</b>");
       $("#neg_prac_q_block").hide();
       $("#neg_prac_question").html("<b>" + stim.question + "</b>");
 
-      // Reset slider state
-      $("#nt_prac_slider").slider("value", 50);
-      nt_slider_moved = false;
+      // Initialize practice negation slider (same logic as acceptability).
+      // Do NOT preset any default value; exp.sliderPost stays null until participant moves it.
+      this.init_sliders();
+      exp.sliderPost = null;
     },
 
     button: function() {
 
-      // -------- First click: go from sentence page to question + slider page --------
+      // ---------- First click: go from sentence (read) page to question + slider page ----------
       if (this.phase === "read") {
         this.phase = "slider";
 
@@ -463,22 +432,18 @@ function make_slides(f) {
         $(".neg_instruction").hide();
         $("#neg_prac_sentence").text("");
         $("#neg_prac_q_block").show();
-
-        // Reset slider and error state once again
-        $("#nt_prac_slider").slider("value", 50);
-        nt_slider_moved = false;
         $(".err").hide();
 
-        return;  // stay on this slide, now in the slider phase
+        return; // stay on this slide, now in the slider phase
       }
 
-      // -------- Second click: slider page, submit response --------
-      if (!nt_slider_moved) {
+      // ---------- Second click: slider page, submit response ----------
+      if (exp.sliderPost == null) {
         $(".err").show();
         return;
       }
 
-      const val = $("#nt_prac_slider").slider("value");
+      const val = exp.sliderPost;
 
       exp.data_trials.push({
         trial_type: "negation_practice",
@@ -489,10 +454,16 @@ function make_slides(f) {
 
       console.log("[DATA] NT_PRACTICE", exp.data_trials[exp.data_trials.length - 1]);
 
-      _stream.apply(this);  // go to the next slide (e.g., last_reminder)
+      _stream.apply(this); // go to next slide (last_reminder)
+    },
+
+    init_sliders: function() {
+      utils.make_slider("#nt_prac_slider", function(event, ui) {
+        // Same as acceptability: no preset; value only exists after participant moves the handle
+        exp.sliderPost = ui.value;
+      });
     }
   });
-
 
 
   slides.last_reminder = slide({
@@ -592,9 +563,9 @@ slides.negation_test_pre = slide({
     $("#neg_pre_q_block").hide();
     $("#neg_pre_question").text("");   // clear question on read page
 
-    // reset slider state
-    $("#nt_slider").slider("value", 50);
-    nt_slider_moved = false;
+    // Initialize pre negation slider
+    this.init_sliders_pre();
+    exp.sliderPost = null;
 
     // update progress for the read page
     exp.trial_index++;
@@ -637,9 +608,6 @@ slides.negation_test_pre = slide({
       $("#neg_pre_question").html("<b>" + parts.question + "</b>");
       $("#neg_pre_q_block").show();
 
-      // reset slider & state for this page
-      $("#nt_slider").slider("value", 50);
-      nt_slider_moved = false;
       $(".err").hide();
 
       // progress for slider page
@@ -657,12 +625,13 @@ slides.negation_test_pre = slide({
     }
 
     // ---------- Second click: SLIDER phase ----------
-    if (!nt_slider_moved) {
+    if (exp.sliderPost == null) {
       $(".err").show();
       return;
     }
 
-    const val = $("#nt_slider").slider("value");
+    const val = exp.sliderPost;
+
     const isFiller = (this.stim.item_type === "filler_negation_test");
     const parts2   = splitNegSentence(this.stim);
 
@@ -681,6 +650,12 @@ slides.negation_test_pre = slide({
     console.log("[DATA] NT_PRE", trial_obj);
 
     _stream.apply(this);  // go to the next stimulus
+  }
+    ,
+  init_sliders_pre: function() {
+    utils.make_slider("#nt_slider", function(event, ui) {
+      exp.sliderPost = ui.value;
+    });
   }
 });
 
@@ -705,9 +680,9 @@ slides.negation_test_post = slide({
     $("#neg_post_q_block").hide();
     $("#neg_post_question").text("");   // clear question on read page
 
-    // Reset slider state
-    $("#nt_slider_post").slider("value", 50);
-    nt_slider_moved = false;
+    // Initialize post negation slider
+    this.init_sliders_post();
+    exp.sliderPost = null;
 
     // Update progress for the read page
     exp.trial_index++;
@@ -750,9 +725,6 @@ slides.negation_test_post = slide({
       $("#neg_post_question").html("<b>" + parts.question + "</b>");
       $("#neg_post_q_block").show();
 
-      // Reset slider and state for this page
-      $("#nt_slider_post").slider("value", 50);
-      nt_slider_moved = false;
       $(".err").hide();
 
       // Update progress for the slider page
@@ -770,12 +742,13 @@ slides.negation_test_post = slide({
     }
 
     // ---------- Second click: SLIDER phase ----------
-    if (!nt_slider_moved) {
+    if (exp.sliderPost == null) {
       $(".err").show();
       return;
     }
 
-    const val      = $("#nt_slider_post").slider("value");
+    const val = exp.sliderPost;
+
     const isFiller = (this.stim.item_type === "filler_negation_test");
     const parts2   = splitNegSentence(this.stim);
 
@@ -794,6 +767,12 @@ slides.negation_test_post = slide({
     console.log("[DATA] NT_POST", trial_obj);
 
     _stream.apply(this);  // go to the next stimulus
+  }
+    ,
+  init_sliders_pre: function() {
+    utils.make_slider("#nt_slider", function(event, ui) {
+      exp.sliderPost = ui.value;
+    });
   }
 });
   
@@ -863,7 +842,7 @@ function init() {
   exp.trial_index = 0; // number of COMPLETED trials so far
   
   //blocks of the experiment:
-  exp.structure=["i0", "consent", "instructions", "practice_slider", "post_practice_1", "practice_slider_bad", "post_practice_2", "negation_practice", "last_reminder", 'negation_test_pre', 'one_slider', 'negation_test_post', 'subj_info', 'thanks'];
+  exp.structure=[ "i0", "consent", "instructions", "practice_slider", "post_practice_1", "practice_slider_bad", "post_practice_2", "negation_practice", "last_reminder", 'negation_test_pre', 'one_slider', 'negation_test_post', 'subj_info', 'thanks'];
 
   exp.data_trials = [];
   //make corresponding slides:
